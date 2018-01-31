@@ -1,0 +1,39 @@
+#!/bin/sh
+
+git_dir=$(git rev-parse --show-toplevel)
+
+pip install pyyaml
+
+declare -a errors=();
+
+declare -i errorCount=-1;
+
+for file in $(git diff-index --name-only --diff-filter=ACM --cached HEAD -- \
+    | grep -P '\.((yaml)|(yml))$'); do
+	python -c 'import yaml,sys;yaml.safe_load(sys.stdin)' < $file 2> /dev/null
+	if [ $? -ne 0 ] ; then
+	    errorCount=errorCount+1;
+        errors[errorCount]="YAML parsing error - $git_dir/$file:"        
+    fi
+	
+done
+
+for file in $(git diff-index --name-only --diff-filter=ACM --cached HEAD -- \
+    | grep -P '\.((js)|(json))$'); do
+	python -mjson.tool $file 2> /dev/null
+    if [ $? -ne 0 ] ; then
+	    errorCount=errorCount+1;
+        errors[errorCount]="JSON parsing error - $git_dir/$file:"           
+    fi
+done
+
+if [ $errorCount -ne -1 ];then 
+  echo "Changes were not commited."
+fi
+  
+for i in "${errors[@]}";
+do 
+  echo "$i"
+done
+
+exit 1;
